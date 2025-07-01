@@ -1,39 +1,106 @@
-import React, { useState } from 'react';
-import { 
-  Wand2, 
-  Settings, 
-  Copy, 
-  Download, 
-  RefreshCw, 
-  Star,
-  MessageSquare,
+import React, { useState, useEffect } from 'react';
+import {
+  Heart,
   ShoppingBag,
   Users,
   Calendar,
-  Headphones,
-  ThumbsUp,
-  Heart,
+  Star,
   Sparkles,
+  AlertCircle,
+  Loader,
+  Copy,
+  Download,
+  Settings,
+  ChevronUp,
   ChevronDown,
-  ChevronUp
+  Wand2,
+  RefreshCw,
+  CheckCircle
 } from 'lucide-react';
+import { CopywritingType, WritingStyle, GenerationParams } from '../types/prompts';
+import { apiService } from '../services/api';
+import { promptService } from '../services/prompts';
+import { storageService } from '../services/storage';
+import { GenerationHistory } from '../types/api';
 
 const CopywritingGenerator: React.FC = () => {
-  const [selectedType, setSelectedType] = useState('product');
-  const [selectedStyle, setSelectedStyle] = useState('professional');
+  const [selectedType, setSelectedType] = useState<CopywritingType>('product');
+  const [selectedStyle, setSelectedStyle] = useState<WritingStyle>('professional');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState('');
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [apiConfigured, setApiConfigured] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // 生成参数
+  const [targetAudience, setTargetAudience] = useState('');
+  const [productInfo, setProductInfo] = useState('');
+  const [keyPoints, setKeyPoints] = useState('');
+  const [length, setLength] = useState<'short' | 'medium' | 'long'>('medium');
+  const [includeEmoji, setIncludeEmoji] = useState(true);
+  const [customRequirements, setCustomRequirements] = useState('');
+
+  useEffect(() => {
+    checkApiConfiguration();
+  }, []);
+
+  const checkApiConfiguration = () => {
+    const activeApi = storageService.getActiveApiConfig();
+    setApiConfigured(!!activeApi);
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // 根据文案类型验证必填字段
+    if (selectedType === 'product' && !productInfo.trim()) {
+      errors.productInfo = '产品推广文案需要填写产品信息';
+    }
+
+    if (selectedType === 'welcome' && !targetAudience.trim()) {
+      errors.targetAudience = '欢迎语文案需要明确目标用户';
+    }
+
+    if (selectedType === 'activity' && !productInfo.trim()) {
+      errors.productInfo = '活动营销文案需要填写活动信息';
+    }
+
+    // 通用验证
+    if (productInfo.length > 500) {
+      errors.productInfo = '产品信息不能超过500字';
+    }
+
+    if (keyPoints.length > 300) {
+      errors.keyPoints = '关键要点不能超过300字';
+    }
+
+    if (customRequirements.length > 200) {
+      errors.customRequirements = '特殊要求不能超过200字';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const clearValidationError = (field: string) => {
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
 
   const copywritingTypes = [
     { id: 'welcome', label: '欢迎语文案', icon: Heart, color: 'from-pink-500 to-rose-500' },
     { id: 'product', label: '产品推广', icon: ShoppingBag, color: 'from-blue-500 to-cyan-500' },
     { id: 'social', label: '朋友圈分享', icon: Users, color: 'from-purple-500 to-indigo-500' },
     { id: 'activity', label: '活动营销', icon: Calendar, color: 'from-orange-500 to-red-500' },
-    { id: 'interaction', label: '互动话题', icon: MessageSquare, color: 'from-green-500 to-emerald-500' },
-    { id: 'service', label: '客服话术', icon: Headphones, color: 'from-teal-500 to-cyan-500' },
-    { id: 'testimonial', label: '用户反馈', icon: ThumbsUp, color: 'from-amber-500 to-orange-500' },
-    { id: 'lifestyle', label: '生活场景', icon: Star, color: 'from-violet-500 to-purple-500' },
+    { id: 'promotion', label: '促销文案', icon: Star, color: 'from-violet-500 to-purple-500' },
+    { id: 'education', label: '教育内容', icon: Sparkles, color: 'from-teal-500 to-cyan-500' },
   ];
 
   const writingStyles = [
@@ -43,17 +110,112 @@ const CopywritingGenerator: React.FC = () => {
     { id: 'urgent', label: '紧迫感', description: '营造稀缺，促进行动' },
   ];
 
-  const sampleContent = {
-    product: "🌟 【春季新品首发】限时特惠来袭！\n\n亲爱的朋友们，我们期待已久的春季新品终于上线啦！✨\n\n💫 核心亮点：\n• 采用进口优质材料，品质保证\n• 独家专利技术，效果显著\n• 48小时快速发货，贴心服务\n\n🎁 限时福利：\n前100名下单立享8折优惠\n满299免邮费\n购买即送精美礼品一份\n\n⏰ 活动截止：本周日24:00\n\n心动不如行动，数量有限，抢完即止！\n点击链接立即购买 👆",
-    welcome: "🎉 欢迎加入我们的大家庭！\n\n很高兴认识你，我是你的专属顾问小张 😊\n\n在这里，你将获得：\n✅ 第一手产品资讯\n✅ 专业购买建议\n✅ 独家优惠活动\n✅ 贴心售后服务\n\n有任何问题随时@我，我会第一时间为你解答！\n\n让我们一起开启美好的购物之旅吧~ 💝",
+  const handleGenerate = async () => {
+    if (!apiConfigured) {
+      setError('请先在系统设置中配置AI API');
+      return;
+    }
+
+    // 表单验证
+    if (!validateForm()) {
+      setError('请检查并修正表单中的错误');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError('');
+    setValidationErrors({});
+
+    try {
+      // 准备生成参数
+      const params: GenerationParams = {
+        type: selectedType,
+        style: selectedStyle,
+        targetAudience,
+        productInfo,
+        keyPoints: keyPoints ? keyPoints.split('\n').filter(k => k.trim()) : [],
+        length,
+        includeEmoji,
+        customRequirements
+      };
+
+      // 获取业务上下文
+      const businessContext = storageService.getBusinessContext();
+
+      // 生成提示词
+      const prompt = promptService.generatePrompt(params, businessContext);
+
+      // 调用API生成内容
+      const response = await apiService.generateContent({
+        prompt,
+        systemPrompt: `你是一个专业的私域运营文案专家，擅长撰写各种类型的营销文案。请根据用户需求生成高质量、有吸引力的文案内容。`,
+        maxTokens: 1000,
+        temperature: 0.7
+      });
+
+      if (response.success && response.content) {
+        setGeneratedContent(response.content);
+
+        // 保存生成历史
+        const historyRecord: GenerationHistory = {
+          id: `gen_${Date.now()}`,
+          type: selectedType,
+          style: selectedStyle,
+          prompt,
+          result: response.content,
+          apiConfig: storageService.getActiveApiId(),
+          createdAt: new Date().toISOString(),
+          parameters: params
+        };
+
+        storageService.saveGenerationHistory(historyRecord);
+      } else {
+        setError(response.error || '生成失败，请重试');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '生成过程中发生错误');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleGenerate = () => {
-    setIsGenerating(true);
-    setTimeout(() => {
-      setGeneratedContent(sampleContent[selectedType as keyof typeof sampleContent] || sampleContent.product);
-      setIsGenerating(false);
-    }, 2000);
+  const handleCopy = async () => {
+    if (generatedContent) {
+      try {
+        await navigator.clipboard.writeText(generatedContent);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } catch (err) {
+        console.error('复制失败:', err);
+        setError('复制失败，请手动复制内容');
+      }
+    }
+  };
+
+  const handleSaveAsTemplate = () => {
+    if (generatedContent) {
+      // 保存为模板的逻辑
+      const template = {
+        id: `template_${Date.now()}`,
+        name: `${copywritingTypes.find(t => t.id === selectedType)?.label || '自定义'}模板`,
+        type: selectedType,
+        style: selectedStyle,
+        content: generatedContent,
+        parameters: {
+          targetAudience,
+          productInfo,
+          keyPoints,
+          length,
+          includeEmoji,
+          customRequirements
+        },
+        createdAt: new Date().toISOString()
+      };
+
+      // 这里可以调用存储服务保存模板
+      console.log('保存模板:', template);
+      // TODO: 实现模板保存功能
+    }
   };
 
   return (
@@ -138,40 +300,136 @@ const CopywritingGenerator: React.FC = () => {
             <div className="space-y-3 sm:space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">文案长度</label>
-                <select className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                  <option>短文案 (50-100字)</option>
-                  <option>中等长度 (100-200字)</option>
-                  <option>长文案 (200+字)</option>
+                <select
+                  value={length}
+                  onChange={(e) => setLength(e.target.value as 'short' | 'medium' | 'long')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="short">短文案 (50-100字)</option>
+                  <option value="medium">中等长度 (100-200字)</option>
+                  <option value="long">长文案 (200+字)</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">目标用户</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
+                  value={targetAudience}
+                  onChange={(e) => {
+                    setTargetAudience(e.target.value);
+                    clearValidationError('targetAudience');
+                  }}
                   placeholder="例：25-35岁职场女性"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                    validationErrors.targetAudience ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  }`}
                 />
+                {validationErrors.targetAudience && (
+                  <p className="mt-1 text-xs text-red-600">{validationErrors.targetAudience}</p>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">产品名称</label>
-                <input 
-                  type="text" 
-                  placeholder="输入产品或服务名称"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">产品信息</label>
+                  <span className={`text-xs ${productInfo.length > 450 ? 'text-red-500' : 'text-gray-500'}`}>
+                    {productInfo.length}/500
+                  </span>
+                </div>
+                <textarea
+                  value={productInfo}
+                  onChange={(e) => {
+                    setProductInfo(e.target.value);
+                    clearValidationError('productInfo');
+                  }}
+                  placeholder="输入产品或服务的详细信息"
+                  rows={3}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                    validationErrors.productInfo ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  }`}
                 />
+                {validationErrors.productInfo && (
+                  <p className="mt-1 text-xs text-red-600">{validationErrors.productInfo}</p>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">关键要点</label>
+                  <span className={`text-xs ${keyPoints.length > 250 ? 'text-red-500' : 'text-gray-500'}`}>
+                    {keyPoints.length}/300
+                  </span>
+                </div>
+                <textarea
+                  value={keyPoints}
+                  onChange={(e) => {
+                    setKeyPoints(e.target.value);
+                    clearValidationError('keyPoints');
+                  }}
+                  placeholder="每行一个要点，例如：&#10;高性价比&#10;快速发货&#10;优质服务"
+                  rows={3}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                    validationErrors.keyPoints ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  }`}
+                />
+                {validationErrors.keyPoints && (
+                  <p className="mt-1 text-xs text-red-600">{validationErrors.keyPoints}</p>
+                )}
+              </div>
+              <div className="flex items-center space-x-3">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeEmoji}
+                    onChange={(e) => setIncludeEmoji(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">包含表情符号</span>
+                </label>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">特殊要求</label>
+                  <span className={`text-xs ${customRequirements.length > 150 ? 'text-red-500' : 'text-gray-500'}`}>
+                    {customRequirements.length}/200
+                  </span>
+                </div>
+                <textarea
+                  value={customRequirements}
+                  onChange={(e) => {
+                    setCustomRequirements(e.target.value);
+                    clearValidationError('customRequirements');
+                  }}
+                  placeholder="其他特殊要求或注意事项"
+                  rows={2}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                    validationErrors.customRequirements ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  }`}
+                />
+                {validationErrors.customRequirements && (
+                  <p className="mt-1 text-xs text-red-600">{validationErrors.customRequirements}</p>
+                )}
               </div>
             </div>
           </div>
 
+          {/* API状态提醒 */}
+          {!apiConfigured && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-orange-600 flex-shrink-0" />
+                <span className="text-sm text-orange-700">请先在系统设置中配置AI API</span>
+              </div>
+            </div>
+          )}
+
           {/* Generate Button */}
           <button
             onClick={handleGenerate}
-            disabled={isGenerating}
+            disabled={isGenerating || !apiConfigured}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm sm:text-base"
           >
             {isGenerating ? (
               <>
-                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                <Loader className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                 <span>AI创作中...</span>
               </>
             ) : (
@@ -191,18 +449,46 @@ const CopywritingGenerator: React.FC = () => {
               <h3 className="text-base sm:text-lg font-semibold text-gray-900">生成结果</h3>
               {generatedContent && (
                 <div className="flex items-center space-x-2">
-                  <button className="flex items-center space-x-1 px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition-colors">
-                    <Copy className="w-4 h-4" />
-                    <span className="text-sm">复制</span>
+                  <button
+                    onClick={handleCopy}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg transition-colors ${
+                      copySuccess
+                        ? 'text-green-600 bg-green-100'
+                        : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                    }`}
+                  >
+                    {copySuccess ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    <span className="text-sm">{copySuccess ? '已复制' : '复制'}</span>
                   </button>
-                  <button className="flex items-center space-x-1 px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition-colors">
+                  <button
+                    onClick={handleSaveAsTemplate}
+                    className="flex items-center space-x-1 px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
                     <Download className="w-4 h-4" />
-                    <span className="text-sm hidden sm:inline">导出</span>
+                    <span className="text-sm hidden sm:inline">保存模板</span>
+                  </button>
+                  <button
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                    className="flex items-center space-x-1 px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span className="text-sm hidden sm:inline">重新生成</span>
                   </button>
                 </div>
               )}
             </div>
             
+            {/* 错误提示 */}
+            {error && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <span className="text-sm text-red-700">{error}</span>
+                </div>
+              </div>
+            )}
+
             <div className="min-h-48 sm:min-h-64 bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-200">
               {isGenerating ? (
                 <div className="flex items-center justify-center h-32 sm:h-40">
@@ -217,25 +503,24 @@ const CopywritingGenerator: React.FC = () => {
                 <div className="space-y-4">
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-blue-600">版本 1</span>
+                      <span className="text-sm font-medium text-blue-600">生成结果</span>
                       <div className="flex items-center space-x-1">
-                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                        <Star className="w-4 h-4 text-gray-300" />
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <span className="text-xs text-gray-500">生成成功</span>
                       </div>
                     </div>
-                    <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">
+                    <div className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">
                       {generatedContent}
-                    </pre>
+                    </div>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-32 sm:h-40">
                   <div className="text-center">
                     <Wand2 className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 text-sm sm:text-base">选择文案类型和参数，点击生成开始创作</p>
+                    <p className="text-gray-500 text-sm sm:text-base">
+                      {apiConfigured ? '选择文案类型和参数，点击生成开始创作' : '请先配置AI API后开始使用'}
+                    </p>
                   </div>
                 </div>
               )}

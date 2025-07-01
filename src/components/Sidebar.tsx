@@ -1,5 +1,5 @@
 import React from 'react';
-import { PenTool, BookTemplate as Template, Database, BarChart3, Settings, User, FileText, Zap, Users, Sparkles, X, Menu } from 'lucide-react';
+import { PenTool, BookTemplate as Template, Database, BarChart3, Settings, User, Users, Sparkles, X, Menu, MessageSquare, ShoppingBag, MessageCircle, FileText, Search, Package, FolderOpen } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -10,12 +10,49 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isMobileMenuOpen, onMobileMenuToggle }) => {
   const menuItems = [
-    { id: 'dashboard', icon: BarChart3, label: '工作台', description: '概览与统计' },
-    { id: 'generate', icon: PenTool, label: '文案生成', description: '智能创作' },
-    { id: 'templates', icon: Template, label: '模板管理', description: '提示词库' },
-    { id: 'data', icon: Database, label: '数据管理', description: '用户产品' },
-    { id: 'team', icon: Users, label: '团队协作', description: '协同工作' },
-    { id: 'settings', icon: Settings, label: '系统设置', description: '配置管理' },
+    {
+      id: 'copywriting',
+      label: '文案生成',
+      icon: FileText,
+      color: 'from-blue-500 to-cyan-500',
+      description: '生成各种类型的营销文案'
+    },
+    {
+      id: 'dialogue',
+      label: '对话创作',
+      icon: MessageSquare,
+      color: 'from-purple-500 to-pink-500',
+      description: '创作对话故事，分析营销话术'
+    },
+    {
+      id: 'product-analysis',
+      label: '产品分析',
+      icon: Search,
+      color: 'from-green-500 to-emerald-500',
+      description: '分析产品信息生成详细文案'
+    },
+    {
+      id: 'product-manager',
+      label: '产品管理',
+      icon: Package,
+      color: 'from-orange-500 to-red-500',
+      description: '管理产品信息和分析结果'
+    },
+
+    {
+      id: 'template-manager',
+      label: '模板管理',
+      icon: FolderOpen,
+      color: 'from-teal-500 to-cyan-500',
+      description: '管理文案和对话模板'
+    },
+    {
+      id: 'settings',
+      label: '系统设置',
+      icon: Settings,
+      color: 'from-gray-500 to-gray-700',
+      description: '配置管理'
+    }
   ];
 
   const handleMenuItemClick = (itemId: string) => {
@@ -54,7 +91,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isMobileMenuO
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo Section */}
-        <div className="p-6 border-b border-gray-100">
+        <button
+          className="w-full text-left p-6 border-b border-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          onClick={() => {
+            onTabChange('dashboard');
+            if (isMobileMenuOpen) onMobileMenuToggle();
+          }}
+        >
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-white" />
@@ -64,7 +107,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isMobileMenuO
               <p className="text-xs text-gray-500">私域运营专家</p>
             </div>
           </div>
-        </div>
+        </button>
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

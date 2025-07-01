@@ -3,6 +3,11 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import CopywritingGenerator from './components/CopywritingGenerator';
 import TemplateManager from './components/TemplateManager';
+import UnifiedTemplateManager from './components/UnifiedTemplateManager';
+import ApiConfig from './components/ApiConfig';
+import ProductAnalyzer from './components/ProductAnalyzer';
+import ProductManager from './components/ProductManager';
+import ConversationHub from './components/ConversationHub';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -14,12 +19,18 @@ function App() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'copywriting':
+        return <CopywritingGenerator />;
+      case 'dialogue':
+        return <ConversationHub />;
+      case 'product-analysis':
+        return <ProductAnalyzer />;
+      case 'product-manager':
+        return <ProductManager />;
+      case 'template-manager':
+        return <UnifiedTemplateManager />;
       case 'dashboard':
         return <Dashboard />;
-      case 'generate':
-        return <CopywritingGenerator />;
-      case 'templates':
-        return <TemplateManager />;
       case 'data':
         return (
           <div className="p-4 sm:p-6">
@@ -35,14 +46,9 @@ function App() {
           </div>
         );
       case 'settings':
-        return (
-          <div className="p-4 sm:p-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">系统设置</h1>
-            <p className="text-gray-600 mt-2 text-sm sm:text-base">系统配置和个人设置功能正在开发中...</p>
-          </div>
-        );
+        return <ApiConfig />;
       default:
-        return <Dashboard />;
+        return <CopywritingGenerator />;
     }
   };
 

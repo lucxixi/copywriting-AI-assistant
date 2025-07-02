@@ -72,10 +72,57 @@ class StorageService {
 
   getActiveApiConfig(): ApiConfig | null {
     const activeId = this.getActiveApiId();
-    if (!activeId) return null;
-    
+    if (!activeId) {
+      // 如果没有激活的API配置，尝试初始化默认配置
+      this.initializeDefaultApiConfig();
+      const newActiveId = this.getActiveApiId();
+      if (!newActiveId) return null;
+
+      const configs = this.getApiConfigs();
+      return configs.find(c => c.id === newActiveId) || null;
+    }
+
     const configs = this.getApiConfigs();
     return configs.find(c => c.id === activeId) || null;
+  }
+
+  // 初始化默认API配置（使用内置Gemini API）
+  private initializeDefaultApiConfig(): void {
+    try {
+      const existingConfigs = this.getApiConfigs();
+
+      // 如果已经有配置，不需要初始化
+      if (existingConfigs.length > 0) {
+        return;
+      }
+
+      console.log('🚀 初始化默认API配置...');
+
+      // 创建默认的Gemini配置
+      const defaultConfig: ApiConfig = {
+        id: 'default_gemini',
+        name: '默认Gemini配置',
+        provider: 'gemini',
+        apiKey: '', // 将使用内置API key
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        model: 'gemini-2.5-flash',
+        maxTokens: 3000,
+        temperature: 0.7,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // 保存默认配置
+      this.saveApiConfig(defaultConfig);
+
+      // 设置为激活状态
+      this.setActiveApi(defaultConfig.id);
+
+      console.log('✅ 默认API配置初始化完成');
+    } catch (error) {
+      console.error('❌ 初始化默认API配置失败:', error);
+    }
   }
 
   // 提示词模板管理
@@ -130,13 +177,26 @@ class StorageService {
     try {
       const history = this.getGenerationHistory();
       history.unshift(record); // 最新的记录放在前面
-      
-      // 限制历史记录数量，保留最近100条
-      if (history.length > 100) {
-        history.splice(100);
+
+      // 获取用户设置的保存期限和数量限制
+      const preferences = this.getUserPreferences();
+      const maxRecords = preferences.historyMaxRecords || 100;
+      const retentionDays = preferences.historyRetentionDays || 30;
+
+      // 按数量限制
+      if (history.length > maxRecords) {
+        history.splice(maxRecords);
       }
-      
-      localStorage.setItem(this.KEYS.GENERATION_HISTORY, JSON.stringify(history));
+
+      // 按时间限制 - 删除超过保存期限的记录
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+      const filteredHistory = history.filter(record => {
+        const recordDate = new Date(record.createdAt);
+        return recordDate >= cutoffDate;
+      });
+
+      localStorage.setItem(this.KEYS.GENERATION_HISTORY, JSON.stringify(filteredHistory));
     } catch (error) {
       console.error('Failed to save generation history:', error);
     }

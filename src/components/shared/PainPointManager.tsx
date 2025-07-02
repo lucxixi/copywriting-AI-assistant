@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { apiService } from '../../services/api';
+import { storageService } from '../../services/storage';
 import {
   AlertTriangle,
   Plus,
@@ -7,7 +9,9 @@ import {
   Trash2,
   Check,
   Target,
-  TrendingDown
+  TrendingDown,
+  Wand2,
+  Loader
 } from 'lucide-react';
 
 export interface PainPoint {
@@ -24,13 +28,19 @@ interface PainPointManagerProps {
   onPainPointsChange: (painPoints: PainPoint[]) => void;
   maxPainPoints?: number;
   categories?: string[];
+  productInfo?: string;
+  productName?: string;
+  enableAIGeneration?: boolean;
 }
 
 const PainPointManager: React.FC<PainPointManagerProps> = ({
   painPoints,
   onPainPointsChange,
   maxPainPoints = 10,
-  categories = ['功能需求', '体验问题', '成本考虑', '时间压力', '信任担忧', '竞品对比']
+  categories = ['功能需求', '体验问题', '成本考虑', '时间压力', '信任担忧', '竞品对比'],
+  productInfo = '',
+  productName = '',
+  enableAIGeneration = true
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingPainPoint, setEditingPainPoint] = useState<PainPoint | null>(null);
@@ -39,6 +49,7 @@ const PainPointManager: React.FC<PainPointManagerProps> = ({
     category: categories[0],
     targetAudience: []
   });
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
 
   const severityConfig = {
     low: { label: '轻微', color: 'green', bgColor: 'bg-green-100', textColor: 'text-green-700' },
@@ -113,6 +124,61 @@ const PainPointManager: React.FC<PainPointManagerProps> = ({
       category: categories[0],
       targetAudience: []
     });
+  };
+
+  const handleGenerateDescription = async () => {
+    if (!newPainPoint.title || !enableAIGeneration) return;
+
+    // 检查API配置
+    const activeApi = storageService.getActiveApiConfig();
+    if (!activeApi) {
+      alert('请先在系统设置中配置AI API');
+      return;
+    }
+
+    setIsGeneratingDescription(true);
+
+    try {
+      const prompt = `请为以下痛点生成详细描述：
+
+产品信息：
+- 产品名称：${productName || '未指定产品'}
+- 产品描述：${productInfo || '无详细信息'}
+
+痛点标题：${newPainPoint.title}
+痛点分类：${newPainPoint.category}
+目标用户：${(newPainPoint.targetAudience || []).join('、') || '通用用户'}
+
+请生成一个详细的痛点描述，要求：
+1. 描述具体的问题表现和用户感受
+2. 说明这个痛点对用户的影响
+3. 解释为什么这个痛点很重要
+4. 控制在100-200字之内
+5. 语言要贴近目标用户群体
+
+请直接输出描述内容，不要包含其他格式或标题。`;
+
+      const response = await apiService.generateContent({
+        prompt,
+        systemPrompt: `你是一个专业的用户体验分析师，擅长分析用户痛点并生成详细描述。请根据产品信息和痛点标题，生成准确、具体的痛点描述。`,
+        maxTokens: 300,
+        temperature: 0.7
+      });
+
+      if (response.success && response.content) {
+        setNewPainPoint(prev => ({
+          ...prev,
+          description: response.content.trim()
+        }));
+      } else {
+        alert('生成失败：' + (response.error || '未知错误'));
+      }
+    } catch (error) {
+      console.error('AI生成描述失败:', error);
+      alert('生成过程中发生错误，请重试');
+    } finally {
+      setIsGeneratingDescription(false);
+    }
   };
 
   const handleAudienceToggle = (audience: string) => {
@@ -233,14 +299,41 @@ const PainPointManager: React.FC<PainPointManagerProps> = ({
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">详细描述</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">详细描述</label>
+                    {enableAIGeneration && newPainPoint.title && (
+                      <button
+                        type="button"
+                        onClick={handleGenerateDescription}
+                        disabled={isGeneratingDescription || !newPainPoint.title}
+                        className="flex items-center space-x-1 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isGeneratingDescription ? (
+                          <>
+                            <Loader className="w-3 h-3 animate-spin" />
+                            <span>生成中...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="w-3 h-3" />
+                            <span>AI生成</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     value={newPainPoint.description || ''}
                     onChange={(e) => setNewPainPoint(prev => ({ ...prev, description: e.target.value }))}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
-                    placeholder="详细描述痛点的具体表现和影响"
+                    placeholder="详细描述痛点的具体表现和影响，或点击AI生成"
                   />
+                  {enableAIGeneration && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 填写痛点标题后，可以使用AI自动生成详细描述
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

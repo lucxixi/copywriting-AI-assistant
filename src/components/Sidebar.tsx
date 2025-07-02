@@ -1,5 +1,5 @@
 import React from 'react';
-import { PenTool, BookTemplate as Template, Database, BarChart3, Settings, User, Users, Sparkles, X, Menu, MessageSquare, ShoppingBag, MessageCircle, FileText, Search, Package, FolderOpen } from 'lucide-react';
+import { PenTool, BookOpen as Template, Database, BarChart3, Settings, User, Users, Sparkles, X, Menu, MessageSquare, ShoppingBag, MessageCircle, FileText, Search, Package, FolderOpen, Clock } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -45,6 +45,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, isMobileMenuO
       icon: FolderOpen,
       color: 'from-teal-500 to-cyan-500',
       description: '管理文案和对话模板'
+    },
+    {
+      id: 'history',
+      label: '历史记录',
+      icon: Clock,
+      color: 'from-indigo-500 to-purple-500',
+      description: '查看和管理生成历史'
     },
     {
       id: 'settings',

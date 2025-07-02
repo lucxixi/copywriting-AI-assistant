@@ -137,15 +137,94 @@ export interface BusinessContext {
 export interface ConversationScript {
   id: string;
   content: string;
-  role: 'promoter' | 'customer' | 'supporter'; // 推广者、客户、托
-  confidence: number; // AI分析的可信度
+  role: 'promoter' | 'customer' | 'supporter' | 'unknown' | string; // 推广者、客户、托或其他角色
+  confidence?: number; // AI分析的可信度
   context?: string; // 对话上下文
-  createdAt: string;
+  speaker?: string; // 说话者名称
+  createdAt?: string;
+  analysis?: {
+    speakingStyle?: {
+      formality: string;
+      tone: string;
+      emotionalLevel: string;
+      directness: string;
+    };
+    languagePatterns?: {
+      fillerWords: string[];
+      emojis: string[];
+      catchphrases: string[];
+      questionPatterns: string[];
+      affirmationPatterns: string[];
+      transitionWords: string[];
+    };
+    communicationHabits?: {
+      averageMessageLength: string;
+      responseSpeed: string;
+      initiationStyle: string;
+      persuasionTechniques: string[];
+    };
+    contextualBehavior?: {
+      businessScenarios: string;
+      casualScenarios: string;
+      problemSolving: string;
+      emotionalSupport: string;
+    };
+    samplePhrases?: string[];
+  };
 }
 
 export interface ScriptAnalysisResult {
+  id: string;
   scripts: ConversationScript[];
-  summary: {
+  analysis: {
+    characters: Array<{
+      name: string;
+      role: string;
+      personality: string;
+      speakingStyle: any;
+      languagePatterns: any;
+      communicationHabits: any;
+      contextualBehavior: any;
+      samplePhrases: string[];
+    }>;
+    conversationFlow: {
+      overallTone: string;
+      scenario: string;
+      purpose: string;
+      effectiveness: string;
+      keyMoments: string[];
+      improvementSuggestions: string[];
+    };
+    learnablePatterns: {
+      successfulTechniques: string[];
+      emotionalTriggers: string[];
+      persuasionFlow: string;
+      adaptableTemplates: Array<{
+        situation: string;
+        template: string;
+        variables: string[];
+        effectiveness: string;
+      }>;
+    };
+    styleTransferGuide: {
+      formalToInformal: string;
+      informalToFormal: string;
+      emotionalAdjustment: string;
+      audienceAdaptation: string;
+    };
+    keyInsights: string[];
+    improvementSuggestions: string[];
+    overallEffectiveness: string;
+  };
+  createdAt: string;
+  metadata?: {
+    analysisType: string;
+    scriptCount: number;
+    charactersIdentified: number;
+    patternsExtracted: number;
+  };
+  // 保持向后兼容
+  summary?: {
     promoterCount: number;
     customerCount: number;
     supporterCount: number;

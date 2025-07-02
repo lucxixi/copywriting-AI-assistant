@@ -20,7 +20,9 @@ import {
   MessageSquare,
   ShoppingBag,
   FileText,
-  Zap
+  Zap,
+  Save,
+  AlertCircle
 } from 'lucide-react';
 import { UnifiedTemplate, TemplateType, TemplateCategory } from '../types/prompts';
 import { storageService } from '../services/storage';
@@ -36,6 +38,28 @@ const UnifiedTemplateManager: React.FC = () => {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<UnifiedTemplate | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<UnifiedTemplate | null>(null);
+  const [newTemplate, setNewTemplate] = useState<Partial<UnifiedTemplate>>({
+    type: 'copywriting',
+    category: 'other',
+    isBuiltIn: false,
+    isActive: true,
+    content: {},
+    metadata: {
+      description: '',
+      tags: [],
+      difficulty: 'beginner',
+      estimatedTime: 5,
+      targetAudience: [],
+      language: 'zh-CN'
+    },
+    usage: {
+      useCount: 0,
+      rating: 5,
+      feedback: [],
+      successRate: 100
+    }
+  });
 
   useEffect(() => {
     loadTemplates();
@@ -178,6 +202,81 @@ const UnifiedTemplateManager: React.FC = () => {
     }
   };
 
+  const handleCreateTemplate = () => {
+    setIsCreating(true);
+    setEditingTemplate(null);
+    setNewTemplate({
+      type: 'copywriting',
+      category: 'other',
+      isBuiltIn: false,
+      isActive: true,
+      content: {},
+      metadata: {
+        description: '',
+        tags: [],
+        difficulty: 'beginner',
+        estimatedTime: 5,
+        targetAudience: [],
+        language: 'zh-CN'
+      },
+      usage: {
+        useCount: 0,
+        rating: 5,
+        feedback: [],
+        successRate: 100
+      }
+    });
+  };
+
+  const handleEditTemplate = (template: UnifiedTemplate) => {
+    setEditingTemplate(template);
+    setNewTemplate(template);
+    setIsCreating(true);
+  };
+
+  const handleSaveTemplate = () => {
+    if (!newTemplate.name || !newTemplate.metadata?.description) {
+      alert('请填写模板名称和描述');
+      return;
+    }
+
+    const templateToSave: UnifiedTemplate = {
+      id: newTemplate.id || `template_${Date.now()}`,
+      name: newTemplate.name,
+      type: newTemplate.type || 'copywriting',
+      category: newTemplate.category || 'other',
+      content: newTemplate.content || {},
+      metadata: {
+        description: newTemplate.metadata?.description || '',
+        tags: newTemplate.metadata?.tags || [],
+        difficulty: newTemplate.metadata?.difficulty || 'beginner',
+        estimatedTime: newTemplate.metadata?.estimatedTime || 5,
+        targetAudience: newTemplate.metadata?.targetAudience || [],
+        language: newTemplate.metadata?.language || 'zh-CN'
+      },
+      usage: newTemplate.usage || {
+        useCount: 0,
+        rating: 5,
+        feedback: [],
+        successRate: 100
+      },
+      isBuiltIn: false,
+      isActive: newTemplate.isActive !== false,
+      createdAt: newTemplate.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    storageService.saveUnifiedTemplate(templateToSave);
+    loadTemplates();
+    handleCancelCreate();
+  };
+
+  const handleCancelCreate = () => {
+    setIsCreating(false);
+    setEditingTemplate(null);
+    setNewTemplate({});
+  };
+
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star
@@ -196,7 +295,7 @@ const UnifiedTemplateManager: React.FC = () => {
           <p className="text-gray-600 mt-1 text-sm sm:text-base">管理所有类型的模板，支持分类、搜索和统计</p>
         </div>
         <button
-          onClick={() => setIsCreating(true)}
+          onClick={handleCreateTemplate}
           className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 sm:px-6 py-2 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-md text-sm sm:text-base"
         >
           <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -440,7 +539,7 @@ const UnifiedTemplateManager: React.FC = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-2">暂无模板</h3>
             <p className="text-gray-600 mb-4">还没有创建任何模板，点击上方按钮开始创建</p>
             <button
-              onClick={() => setIsCreating(true)}
+              onClick={handleCreateTemplate}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
             >
               创建第一个模板
@@ -448,6 +547,245 @@ const UnifiedTemplateManager: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 创建/编辑模板模态框 */}
+      {isCreating && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  {editingTemplate ? '编辑模板' : '创建新模板'}
+                </h2>
+                <button
+                  onClick={handleCancelCreate}
+                  className="p-2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* 基本信息 */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">基本信息</h3>
+
+                  {/* 模板名称 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      模板名称 *
+                    </label>
+                    <input
+                      type="text"
+                      value={newTemplate.name || ''}
+                      onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
+                      placeholder="输入模板名称"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* 模板类型 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      模板类型 *
+                    </label>
+                    <select
+                      value={newTemplate.type || 'copywriting'}
+                      onChange={(e) => setNewTemplate({ ...newTemplate, type: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="copywriting">文案生成</option>
+                      <option value="prompt">提示词</option>
+                      <option value="product">产品分析</option>
+                      <option value="dialogue">对话故事</option>
+                      <option value="script">话术分析</option>
+                    </select>
+                  </div>
+
+                  {/* 模板分类 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      模板分类 *
+                    </label>
+                    <select
+                      value={newTemplate.category || 'other'}
+                      onChange={(e) => setNewTemplate({ ...newTemplate, category: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="welcome">欢迎语</option>
+                      <option value="product">产品推广</option>
+                      <option value="social">社交分享</option>
+                      <option value="activity">活动营销</option>
+                      <option value="service">客服话术</option>
+                      <option value="testimonial">用户反馈</option>
+                      <option value="lifestyle">生活场景</option>
+                      <option value="interaction">互动话题</option>
+                      <option value="analysis">分析类</option>
+                      <option value="story">故事类</option>
+                      <option value="other">其他</option>
+                    </select>
+                  </div>
+
+                  {/* 模板描述 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      模板描述 *
+                    </label>
+                    <textarea
+                      value={newTemplate.metadata?.description || ''}
+                      onChange={(e) => setNewTemplate({
+                        ...newTemplate,
+                        metadata: { ...newTemplate.metadata!, description: e.target.value }
+                      })}
+                      placeholder="详细描述这个模板的用途和特点"
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 模板内容 */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">模板内容</h3>
+
+                  {/* 提示词内容 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      提示词内容
+                    </label>
+                    <textarea
+                      value={newTemplate.content?.prompt || ''}
+                      onChange={(e) => setNewTemplate({
+                        ...newTemplate,
+                        content: { ...newTemplate.content, prompt: e.target.value }
+                      })}
+                      placeholder="输入模板的提示词内容..."
+                      rows={6}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* 系统提示词 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      系统提示词
+                    </label>
+                    <textarea
+                      value={newTemplate.content?.systemPrompt || ''}
+                      onChange={(e) => setNewTemplate({
+                        ...newTemplate,
+                        content: { ...newTemplate.content, systemPrompt: e.target.value }
+                      })}
+                      placeholder="输入系统级提示词..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 元数据 */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">附加信息</h3>
+
+                  {/* 标签 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      标签
+                    </label>
+                    <input
+                      type="text"
+                      value={newTemplate.metadata?.tags?.join(', ') || ''}
+                      onChange={(e) => setNewTemplate({
+                        ...newTemplate,
+                        metadata: {
+                          ...newTemplate.metadata!,
+                          tags: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                        }
+                      })}
+                      placeholder="用逗号分隔，如：营销, 推广, 创意"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* 难度和预计时间 */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        难度等级
+                      </label>
+                      <select
+                        value={newTemplate.metadata?.difficulty || 'beginner'}
+                        onChange={(e) => setNewTemplate({
+                          ...newTemplate,
+                          metadata: { ...newTemplate.metadata!, difficulty: e.target.value as any }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="beginner">初级</option>
+                        <option value="intermediate">中级</option>
+                        <option value="advanced">高级</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        预计时间（分钟）
+                      </label>
+                      <input
+                        type="number"
+                        value={newTemplate.metadata?.estimatedTime || 5}
+                        onChange={(e) => setNewTemplate({
+                          ...newTemplate,
+                          metadata: { ...newTemplate.metadata!, estimatedTime: parseInt(e.target.value) || 5 }
+                        })}
+                        min="1"
+                        max="120"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 目标用户 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      目标用户
+                    </label>
+                    <input
+                      type="text"
+                      value={newTemplate.metadata?.targetAudience?.join(', ') || ''}
+                      onChange={(e) => setNewTemplate({
+                        ...newTemplate,
+                        metadata: {
+                          ...newTemplate.metadata!,
+                          targetAudience: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                        }
+                      })}
+                      placeholder="用逗号分隔，如：营销人员, 内容创作者, 企业主"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-8 pt-6 border-t border-gray-200">
+                <button
+                  onClick={handleSaveTemplate}
+                  className="flex-1 flex items-center justify-center space-x-2 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{editingTemplate ? '保存修改' : '创建模板'}</span>
+                </button>
+                <button
+                  onClick={handleCancelCreate}
+                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

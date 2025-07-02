@@ -3,10 +3,8 @@ import {
   MessageSquare,
   AlertCircle,
   Loader,
-  Copy,
-  ShoppingBag,
   Wand2,
-  CheckCircle
+  ShoppingBag
 } from 'lucide-react';
 import {
   ProductAnalysisResult
@@ -16,6 +14,7 @@ import { storageService } from '../services/storage';
 import CharacterEditor, { Character } from './shared/CharacterEditor';
 import SceneSelector, { Scene } from './shared/SceneSelector';
 import PainPointManager, { PainPoint } from './shared/PainPointManager';
+import DialogueDisplay from './shared/DialogueDisplay';
 
 const DialogueGenerator: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<ProductAnalysisResult | null>(null);
@@ -27,10 +26,22 @@ const DialogueGenerator: React.FC = () => {
   const [painPoints, setPainPoints] = useState<PainPoint[]>([]);
   const [productInfo, setProductInfo] = useState('');
   const [customRequirements, setCustomRequirements] = useState('');
+  const [dialogueStyle, setDialogueStyle] = useState('natural');
+  const [dialogueLength, setDialogueLength] = useState('medium');
+  const [dialogueTone, setDialogueTone] = useState('friendly');
+  const [includeEmotions, setIncludeEmotions] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [dialogueStory, setDialogueStory] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [apiConfigured, setApiConfigured] = useState(false);
+
+  // 添加调试日志
+  console.log('DialogueGenerator rendering...', {
+    selectedScene,
+    characters: characters.length,
+    painPoints: painPoints.length,
+    apiConfigured
+  });
 
   useEffect(() => {
     loadAvailableProducts();
@@ -205,6 +216,35 @@ const DialogueGenerator: React.FC = () => {
     const productName = selectedProduct?.product?.name || '产品';
     const productDesc = selectedProduct?.product?.description || productInfo;
 
+    // 风格映射
+    const styleMap = {
+      natural: '自然真实',
+      formal: '正式专业',
+      casual: '轻松随意',
+      humorous: '幽默风趣',
+      emotional: '情感丰富'
+    };
+
+    // 长度映射
+    const lengthMap = {
+      short: { words: '200-300字', rounds: '4-6轮对话' },
+      medium: { words: '400-600字', rounds: '8-12轮对话' },
+      long: { words: '700-1000字', rounds: '15-20轮对话' }
+    };
+
+    // 语调映射
+    const toneMap = {
+      friendly: '友好亲切',
+      professional: '专业严谨',
+      enthusiastic: '热情积极',
+      calm: '平和理性',
+      persuasive: '说服力强'
+    };
+
+    const currentLength = lengthMap[dialogueLength as keyof typeof lengthMap];
+    const currentStyle = styleMap[dialogueStyle as keyof typeof styleMap];
+    const currentTone = toneMap[dialogueTone as keyof typeof toneMap];
+
     return `请为以下产品创作一个对话故事：
 
 产品信息：
@@ -227,19 +267,27 @@ ${painPoints.map((point, index) =>
   `${index + 1}. ${point.title}：${point.description}（严重程度：${point.severity}）`
 ).join('\n')}
 
+对话风格要求：
+- 整体风格：${currentStyle}
+- 语调特点：${currentTone}
+- 对话长度：${currentLength.words}（${currentLength.rounds}）
+${includeEmotions ? '- 包含情感表达：适当添加情感描述和动作描述' : '- 纯对话形式：只包含对话内容，不添加情感描述'}
+
 特殊要求：
 ${customRequirements || '无'}
 
 请创作一个自然流畅的对话，要求：
-1. 对话要真实自然，符合各角色的性格特点
-2. 巧妙地融入产品信息，不要过于生硬
-3. 通过对话展现用户痛点，并展示产品如何解决这些痛点
-4. 对话长度适中，大约8-12轮对话
-5. 每轮对话请标明说话人姓名
+1. 严格按照指定的风格和语调进行创作
+2. 对话要真实自然，符合各角色的性格特点
+3. 巧妙地融入产品信息，不要过于生硬
+4. 通过对话展现用户痛点，并展示产品如何解决这些痛点
+5. 控制在指定的对话长度范围内
+6. 每轮对话请标明说话人姓名
+${includeEmotions ? '7. 适当添加情感描述，如：（微笑）、（思考）、（惊喜）等' : '7. 只输出纯对话内容'}
 
 请按以下格式输出：
-[角色名称]：[对话内容]
-[角色名称]：[对话内容]
+[角色名称]：[对话内容]${includeEmotions ? '（情感描述）' : ''}
+[角色名称]：[对话内容]${includeEmotions ? '（情感描述）' : ''}
 ...`;
   };
 
@@ -250,6 +298,59 @@ ${customRequirements || '无'}
         // 可以添加成功提示
       } catch (err) {
         console.error('复制失败:', err);
+      }
+    }
+  };
+
+  const handleSaveAsTemplate = () => {
+    if (dialogueStory) {
+      const templateName = prompt('请输入模板名称:', `对话故事模板_${new Date().toLocaleDateString()}`);
+
+      if (!templateName) return;
+
+      // 创建统一模板格式
+      const template = {
+        id: `template_${Date.now()}`,
+        name: templateName,
+        type: 'dialogue' as const,
+        category: 'story' as const,
+        content: {
+          prompt: dialogueStory,
+          systemPrompt: `你是一个专业的对话创作专家，擅长创作真实自然的对话故事。请根据产品信息和用户痛点，创作一个引人入胜的对话故事，突出产品价值。`,
+          variables: [],
+          examples: [dialogueStory],
+          structure: {
+            scene: selectedScene?.name || '',
+            characters: characters.map(c => ({ name: c.name, role: c.role, personality: c.personality })),
+            painPoints: painPoints.map(p => ({ title: p.title, description: p.description }))
+          }
+        },
+        metadata: {
+          description: `基于${selectedScene?.name || '自定义场景'}的对话故事模板`,
+          tags: ['对话故事', selectedScene?.name || '自定义', '营销'],
+          difficulty: 'intermediate' as const,
+          estimatedTime: 10,
+          targetAudience: ['营销人员', '内容创作者'],
+          language: 'zh-CN' as const
+        },
+        usage: {
+          useCount: 0,
+          rating: 5,
+          feedback: [],
+          successRate: 100
+        },
+        isBuiltIn: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        storageService.saveUnifiedTemplate(template);
+        alert('模板保存成功！您可以在模板管理中查看和使用。');
+      } catch (error) {
+        console.error('保存模板失败:', error);
+        alert('模板保存失败，请重试。');
       }
     }
   };
@@ -265,29 +366,39 @@ ${customRequirements || '无'}
   };
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-6 p-6 bg-gray-50">
+    <div className="h-full flex flex-col lg:flex-row gap-8 p-6 bg-gray-50">
       {/* Left Panel - Input */}
-      <div className="lg:w-1/2 space-y-6">
+      <div className="lg:w-1/2 space-y-6 max-h-full overflow-y-auto">
         {/* API Status */}
         {!apiConfigured && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0" />
-              <span className="text-sm text-orange-700">请先在系统设置中配置AI API</span>
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-xl p-4 shadow-sm">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-orange-800">API未配置</p>
+                <p className="text-xs text-orange-600">请先在系统设置中配置AI API</p>
+              </div>
             </div>
           </div>
         )}
 
         {/* Product Selection */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <ShoppingBag className="w-5 h-5 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900">产品信息</h3>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <ShoppingBag className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">产品信息</h3>
+                <p className="text-xs text-gray-500">选择或输入产品详情</p>
+              </div>
             </div>
             <button
               onClick={() => setShowProductSelector(!showProductSelector)}
-              className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm"
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all text-sm font-medium shadow-sm"
             >
               选择已分析产品
             </button>
@@ -358,27 +469,131 @@ ${customRequirements || '无'}
             painPoints={painPoints}
             onPainPointsChange={setPainPoints}
             maxPainPoints={8}
+            productInfo={selectedProduct?.product?.description || productInfo}
+            productName={selectedProduct?.product?.name || '自定义产品'}
+            enableAIGeneration={true}
           />
         </div>
 
+        {/* Dialogue Style Controls */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-8 h-8 bg-gradient-to-br from-pink-100 to-purple-100 rounded-lg flex items-center justify-center">
+              <span className="text-lg">🎭</span>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">对话风格设置</h3>
+              <p className="text-xs text-gray-500">自定义对话的风格和特点</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 对话风格 */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">对话风格</label>
+              <select
+                value={dialogueStyle}
+                onChange={(e) => setDialogueStyle(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white shadow-sm hover:shadow-md"
+              >
+                <option value="natural">🌿 自然真实</option>
+                <option value="formal">👔 正式专业</option>
+                <option value="casual">😊 轻松随意</option>
+                <option value="humorous">😄 幽默风趣</option>
+                <option value="emotional">💝 情感丰富</option>
+              </select>
+            </div>
+
+            {/* 对话长度 */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">对话长度</label>
+              <select
+                value={dialogueLength}
+                onChange={(e) => setDialogueLength(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white shadow-sm hover:shadow-md"
+              >
+                <option value="short">📝 简短（4-6轮对话）</option>
+                <option value="medium">📄 中等（8-12轮对话）</option>
+                <option value="long">📚 详细（15-20轮对话）</option>
+              </select>
+            </div>
+
+            {/* 语调特点 */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">语调特点</label>
+              <select
+                value={dialogueTone}
+                onChange={(e) => setDialogueTone(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white shadow-sm hover:shadow-md"
+              >
+                <option value="friendly">🤝 友好亲切</option>
+                <option value="professional">💼 专业严谨</option>
+                <option value="enthusiastic">🔥 热情积极</option>
+                <option value="calm">🧘 平和理性</option>
+                <option value="persuasive">💪 说服力强</option>
+              </select>
+            </div>
+
+            {/* 情感表达 */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">表达方式</label>
+              <div className="space-y-3">
+                <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name="emotions"
+                    checked={includeEmotions}
+                    onChange={() => setIncludeEmotions(true)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="ml-3 text-sm font-medium text-gray-700">💭 包含情感描述</span>
+                </label>
+                <label className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name="emotions"
+                    checked={!includeEmotions}
+                    onChange={() => setIncludeEmotions(false)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="ml-3 text-sm font-medium text-gray-700">💬 纯对话形式</span>
+                </label>
+              </div>
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  {includeEmotions ? '✨ 将添加（微笑）、（思考）等情感描述，让对话更生动' : '📝 只输出对话内容，不包含动作描述，更简洁'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Custom Requirements */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">特殊要求</h3>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+              <span className="text-lg">📝</span>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">特殊要求</h3>
+              <p className="text-xs text-gray-500">添加个性化需求和注意事项</p>
+            </div>
+          </div>
           <textarea
             value={customRequirements}
             onChange={(e) => setCustomRequirements(e.target.value)}
             placeholder="输入任何特殊要求或注意事项..."
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none"
           />
         </div>
 
         {/* Generate Button */}
-        <div className="flex space-x-3">
+        <div className="flex space-x-4">
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !apiConfigured}
-            className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center space-x-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
           >
             {isGenerating ? (
               <>
@@ -395,7 +610,7 @@ ${customRequirements || '无'}
 
           <button
             onClick={clearForm}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="px-6 py-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-medium hover:shadow-md"
           >
             清空
           </button>
@@ -403,28 +618,27 @@ ${customRequirements || '无'}
       </div>
 
       {/* Right Panel - Output */}
-      <div className="lg:w-1/2">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-full">
+      <div className="lg:w-1/2 flex flex-col">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-full flex flex-col hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">生成结果</h3>
-            {dialogueStory && (
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleCopy}
-                  className="flex items-center space-x-1 px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <Copy className="w-4 h-4" />
-                  <span>复制</span>
-                </button>
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="flex items-center space-x-1 px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-                >
-                  <Wand2 className="w-4 h-4" />
-                  <span>重新生成</span>
-                </button>
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-purple-600" />
               </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">生成结果</h3>
+                <p className="text-xs text-gray-500">AI创作的对话内容</p>
+              </div>
+            </div>
+            {dialogueStory && (
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all disabled:opacity-50 text-sm font-medium shadow-sm"
+              >
+                <Wand2 className="w-4 h-4" />
+                <span>重新生成</span>
+              </button>
             )}
           </div>
 
@@ -439,35 +653,50 @@ ${customRequirements || '无'}
           )}
 
           {/* Content Display */}
-          <div className="min-h-96 bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-200">
+          <div className="flex-1 min-h-0">
             {isGenerating ? (
-              <div className="flex items-center justify-center h-40">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <MessageSquare className="w-6 h-6 text-white animate-pulse" />
+              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-8 border-2 border-dashed border-blue-200 h-full">
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                      <MessageSquare className="w-8 h-8 text-white animate-pulse" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-800 mb-2">AI正在创作对话故事</h4>
+                    <p className="text-gray-600 mb-6">请稍候，正在为您生成精彩的对话内容...</p>
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>
+                      <div className="w-3 h-3 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
                   </div>
-                  <p className="text-gray-600">AI正在创作对话故事...</p>
                 </div>
               </div>
             ) : dialogueStory ? (
-              <div className="space-y-4">
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-sm font-medium text-green-700">生成成功</span>
-                  </div>
-                  <div className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">
-                    {dialogueStory}
-                  </div>
-                </div>
-              </div>
+              <DialogueDisplay
+                dialogue={dialogueStory}
+                characters={characters}
+                onCopy={handleCopy}
+                onSaveAsTemplate={handleSaveAsTemplate}
+              />
             ) : (
-              <div className="flex items-center justify-center h-40">
-                <div className="text-center">
-                  <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    {apiConfigured ? '配置参数后点击生成开始创作' : '请先配置AI API后开始使用'}
-                  </p>
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8 border-2 border-dashed border-gray-300 h-full">
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <MessageSquare className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">准备开始创作</h4>
+                    <p className="text-gray-500 max-w-sm">
+                      {apiConfigured ? '配置好参数后，点击生成按钮开始AI创作' : '请先在系统设置中配置AI API'}
+                    </p>
+                    {!apiConfigured && (
+                      <div className="mt-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                          需要配置API
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

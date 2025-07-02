@@ -194,27 +194,49 @@ const CopywritingGenerator: React.FC = () => {
 
   const handleSaveAsTemplate = () => {
     if (generatedContent) {
-      // 保存为模板的逻辑
+      const templateName = prompt('请输入模板名称:', `${copywritingTypes.find(t => t.id === selectedType)?.label || '自定义'}模板_${new Date().toLocaleDateString()}`);
+
+      if (!templateName) return;
+
+      // 创建统一模板格式
       const template = {
         id: `template_${Date.now()}`,
-        name: `${copywritingTypes.find(t => t.id === selectedType)?.label || '自定义'}模板`,
-        type: selectedType,
-        style: selectedStyle,
-        content: generatedContent,
-        parameters: {
-          targetAudience,
-          productInfo,
-          keyPoints,
-          length,
-          includeEmoji,
-          customRequirements
+        name: templateName,
+        type: 'copywriting' as const,
+        category: selectedType as any,
+        content: {
+          prompt: generatedContent,
+          systemPrompt: `你是一个专业的私域运营文案专家，擅长撰写各种类型的营销文案。请根据用户需求生成高质量、有吸引力的文案内容。`,
+          variables: [],
+          examples: [generatedContent]
         },
-        createdAt: new Date().toISOString()
+        metadata: {
+          description: `基于${copywritingTypes.find(t => t.id === selectedType)?.label || '自定义'}类型生成的模板`,
+          tags: [selectedType, selectedStyle, '文案生成'],
+          difficulty: 'beginner' as const,
+          estimatedTime: 5,
+          targetAudience: targetAudience ? [targetAudience] : [],
+          language: 'zh-CN' as const
+        },
+        usage: {
+          useCount: 0,
+          rating: 5,
+          feedback: [],
+          successRate: 100
+        },
+        isBuiltIn: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
-      // 这里可以调用存储服务保存模板
-      console.log('保存模板:', template);
-      // TODO: 实现模板保存功能
+      try {
+        storageService.saveUnifiedTemplate(template);
+        alert('模板保存成功！您可以在模板管理中查看和使用。');
+      } catch (error) {
+        console.error('保存模板失败:', error);
+        alert('模板保存失败，请重试。');
+      }
     }
   };
 

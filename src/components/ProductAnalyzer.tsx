@@ -128,6 +128,24 @@ const ProductAnalyzer: React.FC = () => {
         // 自动归档到产品管理
         storageService.saveProductAnalysis(parsedResult);
 
+        // 保存到通用历史记录
+        const historyRecord = {
+          id: `product_${Date.now()}`,
+          type: 'product',
+          style: 'analysis',
+          prompt,
+          result: response.content,
+          apiConfig: storageService.getActiveApiId(),
+          createdAt: new Date().toISOString(),
+          parameters: {
+            productName: parsedResult.product.name,
+            category: parsedResult.product.category,
+            targetAudience: parsedResult.product.targetAudience,
+            hasImage: !!imagePreview
+          }
+        };
+        storageService.saveGenerationHistory(historyRecord);
+
         // 显示成功状态
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
@@ -232,21 +250,68 @@ ${analysisResult.marketingCopy}`;
 
   const handleSaveAsTemplate = () => {
     if (!analysisResult) return;
-    
-    // 将分析结果保存为模板
+
+    const templateName = prompt('请输入模板名称:', `产品分析模板_${new Date().toLocaleDateString()}`);
+
+    if (!templateName) return;
+
+    // 创建统一模板格式
     const template = {
-      id: `product_template_${Date.now()}`,
-      name: `产品分析模板_${new Date().toLocaleDateString()}`,
-      product: analysisResult.product,
-      analysis: analysisResult,
-      createdAt: new Date().toISOString()
+      id: `template_${Date.now()}`,
+      name: templateName,
+      type: 'product' as const,
+      category: 'analysis' as const,
+      content: {
+        prompt: `产品分析结果：
+
+产品信息：
+- 名称：${analysisResult.product.name}
+- 类型：${analysisResult.product.category}
+- 描述：${analysisResult.product.description}
+- 目标用户：${analysisResult.product.targetAudience}
+
+用户痛点：${analysisResult.painPoints.join('、')}
+
+关键卖点：${analysisResult.keySellingPoints.join('、')}
+
+营销文案：
+${analysisResult.marketingCopy}`,
+        systemPrompt: `你是一个专业的产品分析专家，擅长分析产品信息并生成营销文案。请严格按照要求的格式输出分析结果，确保所有信息都基于提供的内容，不要虚构功能。`,
+        variables: [],
+        examples: [analysisResult.marketingCopy],
+        structure: {
+          product: analysisResult.product,
+          painPoints: analysisResult.painPoints,
+          keySellingPoints: analysisResult.keySellingPoints
+        }
+      },
+      metadata: {
+        description: `基于${analysisResult.product.name}的产品分析模板`,
+        tags: ['产品分析', analysisResult.product.category, '营销文案'],
+        difficulty: 'intermediate' as const,
+        estimatedTime: 15,
+        targetAudience: ['产品经理', '营销人员', '内容创作者'],
+        language: 'zh-CN' as const
+      },
+      usage: {
+        useCount: 0,
+        rating: 5,
+        feedback: [],
+        successRate: 100
+      },
+      isBuiltIn: false,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
-    
+
     try {
-      storageService.saveProductTemplate(template);
+      storageService.saveUnifiedTemplate(template);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
+      alert('模板保存成功！您可以在模板管理中查看和使用。');
     } catch (err) {
+      console.error('保存模板失败:', err);
       setError('模板保存失败，请重试');
     }
   };

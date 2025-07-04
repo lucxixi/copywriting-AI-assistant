@@ -1,29 +1,44 @@
 import React from 'react';
+import { useHistory } from '../hooks/useHistory';
+import { useProducts } from '../hooks/useProducts';
+import { useTemplates } from '../hooks/useTemplates';
 
 interface DashboardWithGuidesProps {
   onTabChange?: (tab: string) => void;
 }
 
-const stats = [
-  { label: '文案生成', value: 128, icon: '📝', tab: 'copywriting' },
-  { label: '产品管理', value: 24, icon: '📦', tab: 'product-manager' },
-  { label: '模板管理', value: 12, icon: '📋', tab: 'template-manager' },
-  { label: '历史记录', value: 320, icon: '🕒', tab: 'history' },
-];
-
-const quickLinks = [
-  { label: '文案生成', icon: '📝', tab: 'copywriting', desc: 'AI智能生成营销文案' },
-  { label: '产品管理', icon: '📦', tab: 'product-manager', desc: '管理你的产品信息' },
-  { label: '模板管理', icon: '📋', tab: 'template-manager', desc: '统一管理文案模板' },
-  { label: '系统设置', icon: '⚙️', tab: 'settings', desc: 'API与界面个性化' },
-];
-
-const guides = [
-  { title: '快速上手', content: '1. 配置API密钥 2. 添加产品 3. 选择模板 4. 一键生成文案' },
-  { title: '常见问题', content: '如遇API异常、生成失败、界面卡顿等，请刷新页面或检查设置。' },
-];
-
 const DashboardWithGuides: React.FC<DashboardWithGuidesProps> = ({ onTabChange }) => {
+  const { records } = useHistory();
+  const { products } = useProducts();
+  const { templates } = useTemplates();
+
+  // 统计数字联动
+  const copywritingCount = records.filter(r => r.type === 'copywriting').length;
+  const productCount = products.length;
+  const templateCount = templates.length;
+  const historyCount = records.length;
+
+  const stats = [
+    { label: '文案生成', value: copywritingCount, icon: '📝', tab: 'copywriting' },
+    { label: '产品管理', value: productCount, icon: '📦', tab: 'product-manager' },
+    { label: '模板管理', value: templateCount, icon: '📋', tab: 'template-manager' },
+    { label: '历史记录', value: historyCount, icon: '🕒', tab: 'history' },
+  ];
+
+  const quickLinks = [
+    { label: '文案生成', icon: '📝', tab: 'copywriting', desc: 'AI智能生成营销文案' },
+    { label: '对话创作', icon: '💬', tab: 'dialogue', desc: '微信群聊对话生成，模拟真实场景' },
+    { label: '产品管理', icon: '📦', tab: 'product-manager', desc: '管理你的产品信息' },
+    { label: '产品分析', icon: '🔍', tab: 'product-analysis', desc: '深度分析产品卖点与用户痛点' },
+    { label: '模板管理', icon: '📋', tab: 'template-manager', desc: '统一管理文案与对话模板' },
+    { label: '系统设置', icon: '⚙️', tab: 'settings', desc: 'API与界面个性化' },
+  ];
+
+  const guides = [
+    { title: '快速上手', content: '1. 配置API密钥 2. 添加产品 3. 选择模板 4. 一键生成文案' },
+    { title: '常见问题', content: '如遇API异常、生成失败、界面卡顿等，请刷新页面或检查设置。' },
+  ];
+
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: 32 }}>
       {/* 欢迎语与引导 */}

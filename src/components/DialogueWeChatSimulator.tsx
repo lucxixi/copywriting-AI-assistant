@@ -72,6 +72,25 @@ const DialogueWeChatSimulator: React.FC = () => {
     return 'long';
   };
 
+  // 示例对话
+  const exampleDialogue = `**小美**：大家好呀，最近有没有什么好用的护肤新品推荐？[微笑]
+
+**阿强**：我前两天刚入手了「水光焕颜精华」，用完皮肤真的很水润！
+
+**小美**：真的吗？敏感肌能用吗？
+
+**阿强**：可以的，我也是敏感肌，用着很温和，没有刺痛感。
+
+**小李**：我也在用，感觉毛孔都细腻了不少[赞]
+
+**小美**：心动了！哪里买比较划算呀？
+
+**阿强**：我是在小程序上买的，最近有活动，买一送一[红包]
+
+**小美**：太棒了，链接发我一下呗～
+
+**阿强**：好的，稍等，我这就发[链接]`;
+
   return (
     <div className="flex flex-col lg:flex-row gap-8 p-6">
       {/* 左侧参数区 */}
@@ -124,11 +143,11 @@ const DialogueWeChatSimulator: React.FC = () => {
             <span>{copySuccess ? '已复制' : '复制'}</span>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg p-4" style={{ minHeight: 320 }}>
+        <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg p-4" style={{ maxHeight: 320, overflowY: 'auto' }}>
           {replacedResult ? (
             <pre className="whitespace-pre-wrap text-sm text-gray-800" style={{ fontFamily: 'inherit' }}>{replacedResult}</pre>
           ) : (
-            <div className="text-gray-400 text-center mt-20">请先选择产品并生成对话</div>
+            <pre className="whitespace-pre-wrap text-sm text-gray-400" style={{ fontFamily: 'inherit' }}>{exampleDialogue}</pre>
           )}
         </div>
         {keywordReplacements.length > 0 && result && (

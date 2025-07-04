@@ -5,8 +5,8 @@ import {
   BookOpen,
   Sparkles
 } from 'lucide-react';
-import DialogueGenerator from './DialogueGenerator';
-import ScriptAnalyzer from './ScriptAnalyzer';
+import DialogueWeChatSimulator from './DialogueWeChatSimulator';
+import ScriptAnalysisSimple from './ScriptAnalysisSimple';
 
 type TabType = 'dialogue' | 'script';
 
@@ -26,7 +26,7 @@ const ConversationHub: React.FC = () => {
       id: 'dialogue',
       name: '创作',
       icon: MessageSquare,
-      description: '创作有情节的对话故事，突出产品价值',
+      description: '微信群聊对话生成，模拟真实私域运营场景',
       color: 'blue'
     },
     {
@@ -41,11 +41,11 @@ const ConversationHub: React.FC = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dialogue':
-        return <DialogueGenerator />;
+        return <DialogueWeChatSimulator />;
       case 'script':
-        return <ScriptAnalyzer />;
+        return <ScriptAnalysisSimple />;
       default:
-        return <DialogueGenerator />;
+        return <DialogueWeChatSimulator />;
     }
   };
 
@@ -57,7 +57,7 @@ const ConversationHub: React.FC = () => {
           {/* Title */}
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">对话创作中心</h1>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">创作有情节的对话故事，分析营销话术，突出产品价值</p>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">微信群聊对话生成，分析营销话术，突出产品价值</p>
           </div>
 
           {/* Tab Navigation */}

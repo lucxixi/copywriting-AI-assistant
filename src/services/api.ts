@@ -1,219 +1,172 @@
-// AI API调用服务
+// AI API调用服务 - 重构版本
 
 import { ApiConfig, ApiResponse, GenerationRequest } from '../types/api';
 import { storageService } from './storage';
+import {
+  BUILTIN_API_KEYS,
+  API_CONFIG,
+  getProviderConfig,
+  getErrorMessage,
+  formatApiResponse,
+  buildRequestBody
+} from '../config/api';
+import { settingsManager } from './settingsManager';
 
 class ApiService {
   async generateContent(request: GenerationRequest): Promise<ApiResponse> {
-    const apiConfig = storageService.getActiveApiConfig();
-    // Gemini内置API key
-    const GEMINI_BUILTIN_KEY = 'AIzaSyBlFLArgo9GmeniLt7NeNou8RfkcfXD5ow';
-    if (!apiConfig) {
+    // 优先从 settingsManager 获取激活的 API Key
+    const settings = settingsManager.loadSettings();
+    const apiKeys = settings.apiKeys || [];
+    const activeId = settings.activeApiKeyId;
+    const activeKey = apiKeys.find(k => k.id === activeId);
+
+    if (!activeKey) {
       return {
         success: false,
-        error: '请先配置并激活一个AI API'
+        error: '请先在系统设置中添加并激活一个API Key'
       };
     }
-    // Gemini内置key优先级：用户自定义>内置
-    if (apiConfig.provider === 'gemini' && !apiConfig.apiKey) {
-      apiConfig.apiKey = GEMINI_BUILTIN_KEY;
-    }
+
+    // 组装 ApiConfig
+    const apiConfig = {
+      id: activeKey.id,
+      name: activeKey.name,
+      provider: activeKey.provider,
+      apiKey: activeKey.key,
+      baseUrl: '',
+      model: settings.model || '',
+      maxTokens: undefined,
+      temperature: undefined,
+      isActive: true,
+      createdAt: '',
+      updatedAt: ''
+    };
+
     try {
-      switch (apiConfig.provider) {
-        case 'openai':
-          return await this.callOpenAI(apiConfig, request);
-        case 'claude':
-          return await this.callClaude(apiConfig, request);
-        case 'custom':
-          return await this.callCustomAPI(apiConfig, request);
-        case 'gemini':
-          return await this.callGemini(apiConfig, request);
-        default:
-          return {
-            success: false,
-            error: '不支持的API提供商'
-          };
-      }
+      return await this.callAPI(apiConfig, request);
     } catch (error) {
       console.error('API调用失败:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : '未知错误'
+        error: this.formatError(error)
       };
     }
   }
 
-  private async callOpenAI(config: ApiConfig, request: GenerationRequest): Promise<ApiResponse> {
-    const url = `${config.baseUrl || 'https://api.openai.com/v1'}/chat/completions`;
-    
-    const messages = [];
-    if (request.systemPrompt) {
-      messages.push({
-        role: 'system',
-        content: request.systemPrompt
-      });
-    }
-    messages.push({
-      role: 'user',
-      content: request.prompt
-    });
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages,
-        max_tokens: request.maxTokens || config.maxTokens || 1000,
-        temperature: request.temperature || config.temperature || 0.7
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+  private async callAPI(config: ApiConfig, request: GenerationRequest): Promise<ApiResponse> {
+    const providerConfig = getProviderConfig(config.provider);
+    if (!providerConfig) {
+      throw new Error('不支持的API提供商');
     }
 
-    const data = await response.json();
-    
+    const url = this.buildApiUrl(config, providerConfig);
+    const headers = this.buildHeaders(config);
+    const body = buildRequestBody(config.provider, {
+      ...request,
+      model: config.model || providerConfig.defaultModel
+    });
+
+    const response = await this.makeRequest(url, headers, body);
+    const formattedResponse = formatApiResponse(response, config.provider);
+
     return {
       success: true,
-      content: data.choices[0]?.message?.content || '',
-      usage: {
-        promptTokens: data.usage?.prompt_tokens || 0,
-        completionTokens: data.usage?.completion_tokens || 0,
-        totalTokens: data.usage?.total_tokens || 0
-      }
+      content: formattedResponse.content,
+      usage: formattedResponse.usage
     };
   }
 
-  private async callClaude(config: ApiConfig, request: GenerationRequest): Promise<ApiResponse> {
-    const url = `${config.baseUrl || 'https://api.anthropic.com/v1'}/messages`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: config.model,
-        max_tokens: request.maxTokens || config.maxTokens || 1000,
-        temperature: request.temperature || config.temperature || 0.7,
-        system: request.systemPrompt || '',
-        messages: [
-          {
-            role: 'user',
-            content: request.prompt
-          }
-        ]
-      })
-    });
+  private buildApiUrl(config: ApiConfig, providerConfig: Record<string, unknown>): string {
+    const baseUrl = config.baseUrl || providerConfig.baseUrl;
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+    switch (config.provider) {
+      case 'openai':
+      case 'openrouter':
+      case 'together':
+      case 'siliconflow':
+        return `${baseUrl}/chat/completions`;
+      case 'claude':
+        return `${baseUrl}/messages`;
+      case 'gemini':
+        return `${baseUrl}/models/${config.model}:generateContent?key=${config.apiKey}`;
+      default:
+        return `${baseUrl}/generate`;
     }
-
-    const data = await response.json();
-    
-    return {
-      success: true,
-      content: data.content[0]?.text || '',
-      usage: {
-        promptTokens: data.usage?.input_tokens || 0,
-        completionTokens: data.usage?.output_tokens || 0,
-        totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
-      }
-    };
   }
 
-  private async callCustomAPI(config: ApiConfig, request: GenerationRequest): Promise<ApiResponse> {
-    if (!config.baseUrl) {
-      throw new Error('自定义API需要配置baseUrl');
-    }
-
-    // 这里实现通用的自定义API调用逻辑
-    // 可以根据需要支持不同的API格式
-    const response = await fetch(config.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: config.model,
-        prompt: request.prompt,
-        system_prompt: request.systemPrompt,
-        max_tokens: request.maxTokens || config.maxTokens || 1000,
-        temperature: request.temperature || config.temperature || 0.7
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    // 尝试从不同的响应格式中提取内容
-    const content = data.content || data.text || data.response || data.output || '';
-    
-    return {
-      success: true,
-      content: content,
-      usage: {
-        promptTokens: data.usage?.prompt_tokens || 0,
-        completionTokens: data.usage?.completion_tokens || 0,
-        totalTokens: data.usage?.total_tokens || 0
-      }
-    };
-  }
-
-  private async callGemini(config: ApiConfig, request: GenerationRequest): Promise<ApiResponse> {
-    // 参考官方API文档 https://ai.google.dev/gemini-api/docs/quickstart?lang=python&hl=zh-cn
-    const url = `${config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta'}/models/${config.model}:generateContent`;
+  private buildHeaders(config: ApiConfig): Record<string, string> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': config.apiKey
+      'Content-Type': 'application/json'
     };
-    const body = {
-      contents: [
-        {
-          parts: [
-            { text: request.prompt }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: request.temperature ?? config.temperature ?? 0.7,
-        maxOutputTokens: request.maxTokens ?? config.maxTokens ?? 1000
-      }
-    };
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+
+    switch (config.provider) {
+      case 'openai':
+      case 'openrouter':
+      case 'together':
+      case 'siliconflow':
+        headers['Authorization'] = `Bearer ${config.apiKey}`;
+        break;
+      case 'claude':
+        headers['x-api-key'] = config.apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+        break;
+      case 'gemini':
+        // Gemini使用URL参数传递API密钥
+        break;
     }
-    const data = await response.json();
-    // Gemini响应结构
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return {
-      success: true,
-      content,
-      usage: undefined // Gemini暂不返回token用量
-    };
+
+    return headers;
   }
 
+  private async makeRequest(url: string, headers: Record<string, string>, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(this.parseErrorMessage(errorData, response.status));
+      }
+
+      return await response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+
+  private parseErrorMessage(errorData: Record<string, unknown>, status: number): string {
+    // 根据不同API提供商解析错误消息
+    const error = errorData.error as Record<string, unknown> | undefined;
+    if (error?.message) {
+      return error.message as string;
+    }
+    if (errorData.message) {
+      return errorData.message as string;
+    }
+    return getErrorMessage(`HTTP_${status}`) || `HTTP ${status} 错误`;
+  }
+
+  private formatError(error: unknown): string {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        return '请求超时，请稍后重试';
+      }
+      return error.message;
+    }
+    return '未知错误';
+  }
+
+  // API连接测试
   async testApiConnection(config: ApiConfig): Promise<{ success: boolean; error?: string }> {
     try {
       const testRequest: GenerationRequest = {
@@ -222,59 +175,20 @@ class ApiService {
         temperature: 0.1
       };
 
-      const response = await this.generateContentWithConfig(config, testRequest);
-      
-      if (response.success) {
-        return { success: true };
-      } else {
-        return { success: false, error: response.error };
-      }
+      const response = await this.callAPI(config, testRequest);
+      return { success: response.success, error: response.error };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : '连接测试失败'
+        error: this.formatError(error)
       };
     }
   }
 
-  private async generateContentWithConfig(config: ApiConfig, request: GenerationRequest): Promise<ApiResponse> {
-    try {
-      switch (config.provider) {
-        case 'openai':
-          return await this.callOpenAI(config, request);
-        case 'claude':
-          return await this.callClaude(config, request);
-        case 'custom':
-          return await this.callCustomAPI(config, request);
-        case 'gemini':
-          return await this.callGemini(config, request);
-        default:
-          return {
-            success: false,
-            error: '不支持的API提供商'
-          };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '未知错误'
-      };
-    }
-  }
-
+  // 获取可用模型列表
   getAvailableModels(provider: string): string[] {
-    switch (provider) {
-      case 'openai':
-        return ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'gpt-4o', 'gpt-4o-mini'];
-      case 'claude':
-        return ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'];
-      case 'gemini':
-        return ['gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
-      case 'custom':
-        return [];
-      default:
-        return [];
-    }
+    const providerConfig = getProviderConfig(provider);
+    return providerConfig?.models || [];
   }
 }
 

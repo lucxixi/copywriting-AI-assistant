@@ -133,104 +133,51 @@ export interface BusinessContext {
   };
 }
 
-// 对话话术分析相关类型
-export interface ConversationScript {
+// 新的话术分析相关类型（基于用户新需求设计）
+export interface ConversationFile {
   id: string;
+  name: string;
   content: string;
-  role: 'promoter' | 'customer' | 'supporter' | 'unknown' | string; // 推广者、客户、托或其他角色
-  confidence?: number; // AI分析的可信度
-  context?: string; // 对话上下文
-  speaker?: string; // 说话者名称
-  createdAt?: string;
-  analysis?: {
-    speakingStyle?: {
-      formality: string;
-      tone: string;
-      emotionalLevel: string;
-      directness: string;
-    };
-    languagePatterns?: {
-      fillerWords: string[];
-      emojis: string[];
-      catchphrases: string[];
-      questionPatterns: string[];
-      affirmationPatterns: string[];
-      transitionWords: string[];
-    };
-    communicationHabits?: {
-      averageMessageLength: string;
-      responseSpeed: string;
-      initiationStyle: string;
-      persuasionTechniques: string[];
-    };
-    contextualBehavior?: {
-      businessScenarios: string;
-      casualScenarios: string;
-      problemSolving: string;
-      emotionalSupport: string;
-    };
-    samplePhrases?: string[];
+  type: 'txt' | 'docx' | 'pdf';
+  size: number;
+  uploadedAt: string;
+  images?: string[]; // base64编码的图片
+  metadata?: {
+    pageCount?: number;
+    extractedText?: string;
   };
 }
 
-export interface ScriptAnalysisResult {
+export interface ScenarioAnalysis {
   id: string;
-  scripts: ConversationScript[];
-  analysis: {
-    characters: Array<{
-      name: string;
-      role: string;
-      personality: string;
-      speakingStyle: any;
-      languagePatterns: any;
-      communicationHabits: any;
-      contextualBehavior: any;
-      samplePhrases: string[];
-    }>;
-    conversationFlow: {
-      overallTone: string;
-      scenario: string;
-      purpose: string;
-      effectiveness: string;
-      keyMoments: string[];
-      improvementSuggestions: string[];
-    };
-    learnablePatterns: {
-      successfulTechniques: string[];
-      emotionalTriggers: string[];
-      persuasionFlow: string;
-      adaptableTemplates: Array<{
-        situation: string;
-        template: string;
-        variables: string[];
-        effectiveness: string;
-      }>;
-    };
-    styleTransferGuide: {
-      formalToInformal: string;
-      informalToFormal: string;
-      emotionalAdjustment: string;
-      audienceAdaptation: string;
-    };
-    keyInsights: string[];
-    improvementSuggestions: string[];
-    overallEffectiveness: string;
+  fileId: string;
+  scenario: 'preheating' | 'preview' | 'launch' | 'follow-up' | 'unknown';
+  confidence: number;
+  characters: Array<{
+    id: string;
+    name: string;
+    role: string;
+    characteristics: string[];
+  }>;
+  keyPoints: string[];
+  style: {
+    tone: string;
+    formality: number;
+    emotionality: number;
   };
+}
+
+export interface MarketingFlow {
+  id: string;
+  name: string;
+  stages: Array<{
+    id: string;
+    name: string;
+    description: string;
+    fileIds: string[];
+    order: number;
+  }>;
   createdAt: string;
-  metadata?: {
-    analysisType: string;
-    scriptCount: number;
-    charactersIdentified: number;
-    patternsExtracted: number;
-  };
-  // 保持向后兼容
-  summary?: {
-    promoterCount: number;
-    customerCount: number;
-    supporterCount: number;
-    commonThemes: string[];
-    effectiveTechniques: string[];
-  };
 }
 
 // 产品分析相关类型

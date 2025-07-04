@@ -1,7 +1,7 @@
 // 本地存储服务
 
 import { ApiConfig, GenerationHistory } from '../types/api';
-import { PromptTemplate, BusinessContext, ScriptAnalysisResult, ProductAnalysisResult, DialogueStory, UnifiedTemplate } from '../types/prompts';
+import { PromptTemplate, BusinessContext, ProductAnalysisResult, DialogueStory, UnifiedTemplate, ConversationFile, ScenarioAnalysis, MarketingFlow } from '../types/prompts';
 
 class StorageService {
   private readonly KEYS = {
@@ -17,7 +17,11 @@ class StorageService {
     PRODUCT_TEMPLATES: 'copywriting_ai_product_templates',
     DIALOGUE_STORIES: 'copywriting_ai_dialogue_stories',
     DIALOGUE_TEMPLATES: 'copywriting_ai_dialogue_templates',
-    UNIFIED_TEMPLATES: 'copywriting_ai_unified_templates'
+    UNIFIED_TEMPLATES: 'copywriting_ai_unified_templates',
+    // 新的话术分析相关存储键
+    CONVERSATION_FILES: 'copywriting_ai_conversation_files',
+    SCENARIO_ANALYSES: 'copywriting_ai_scenario_analyses',
+    MARKETING_FLOWS: 'copywriting_ai_marketing_flows'
   };
 
   // API配置管理
@@ -71,6 +75,13 @@ class StorageService {
   }
 
   getActiveApiConfig(): ApiConfig | null {
+    // 首先检查新的SystemSettings API配置
+    const systemSettings = this.getSystemSettingsApiConfig();
+    if (systemSettings) {
+      return systemSettings;
+    }
+
+    // 回退到旧的API配置系统
     const activeId = this.getActiveApiId();
     if (!activeId) {
       // 如果没有激活的API配置，尝试初始化默认配置
@@ -84,6 +95,74 @@ class StorageService {
 
     const configs = this.getApiConfigs();
     return configs.find(c => c.id === activeId) || null;
+  }
+
+  // 获取SystemSettings中的API配置
+  private getSystemSettingsApiConfig(): ApiConfig | null {
+    try {
+      const systemSettings = localStorage.getItem('systemSettings');
+      if (!systemSettings) return null;
+
+      const settings = JSON.parse(systemSettings);
+      if (!settings.apiKeys || settings.apiKeys.length === 0) return null;
+
+      // 找到激活的API密钥
+      const activeApiKey = settings.apiKeys.find((key: { id: string }) => key.id === settings.activeApiKeyId);
+      if (!activeApiKey) return null;
+
+      // 转换为ApiConfig格式
+      const apiConfig: ApiConfig = {
+        id: activeApiKey.id,
+        name: activeApiKey.name,
+        provider: this.mapProviderName(activeApiKey.provider),
+        apiKey: activeApiKey.key,
+        baseUrl: this.getProviderBaseUrl(activeApiKey.provider),
+        model: settings.model || this.getDefaultModel(activeApiKey.provider),
+        maxTokens: settings.maxTokens || 1000,
+        temperature: settings.temperature || 0.7,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      return apiConfig;
+    } catch (error) {
+      console.error('Failed to get SystemSettings API config:', error);
+      return null;
+    }
+  }
+
+  // 映射提供商名称
+  private mapProviderName(provider: string): 'openai' | 'claude' | 'custom' | 'gemini' {
+    switch (provider) {
+      case 'google': return 'gemini';
+      case 'openrouter': return 'openai';
+      case 'together': return 'openai';
+      case 'siliconflow': return 'openai';
+      default: return 'custom';
+    }
+  }
+
+  // 获取提供商基础URL
+  private getProviderBaseUrl(provider: string): string {
+    switch (provider) {
+      case 'google': return 'https://generativelanguage.googleapis.com/v1beta';
+      case 'openrouter': return 'https://openrouter.ai/api/v1';
+      case 'together': return 'https://api.together.xyz/v1';
+      case 'siliconflow': return 'https://api.siliconflow.cn/v1';
+      default: return '';
+    }
+  }
+
+  // 获取默认模型
+  private getDefaultModel(provider: string): string {
+    switch (provider) {
+      case 'google': return 'gemini-1.5-flash';
+      case 'openrouter': return 'gpt-3.5-turbo';
+      case 'together': return 'meta-llama/Llama-2-7b-chat-hf';
+      case 'siliconflow': return 'qwen/Qwen2-7B-Instruct';
+      default: return 'gpt-3.5-turbo';
+    }
   }
 
   // 初始化默认API配置（使用内置Gemini API）
@@ -271,7 +350,7 @@ class StorageService {
     }
   }
 
-  getScriptTemplates(): any[] {
+  getScriptTemplates(): Record<string, unknown>[] {
     try {
       const templates = localStorage.getItem(this.KEYS.SCRIPT_TEMPLATES);
       return templates ? JSON.parse(templates) : [];
@@ -281,7 +360,7 @@ class StorageService {
     }
   }
 
-  saveScriptTemplate(template: any): void {
+  saveScriptTemplate(template: Record<string, unknown>): void {
     try {
       const templates = this.getScriptTemplates();
       const existingIndex = templates.findIndex(t => t.id === template.id);
@@ -333,7 +412,7 @@ class StorageService {
     }
   }
 
-  getProductTemplates(): any[] {
+  getProductTemplates(): Record<string, unknown>[] {
     try {
       const templates = localStorage.getItem(this.KEYS.PRODUCT_TEMPLATES);
       return templates ? JSON.parse(templates) : [];
@@ -343,7 +422,7 @@ class StorageService {
     }
   }
 
-  saveProductTemplate(template: any): void {
+  saveProductTemplate(template: Record<string, unknown>): void {
     try {
       const templates = this.getProductTemplates();
       const existingIndex = templates.findIndex(t => t.id === template.id);
@@ -387,7 +466,7 @@ class StorageService {
     }
   }
 
-  getDialogueTemplates(): any[] {
+  getDialogueTemplates(): Record<string, unknown>[] {
     try {
       const templates = localStorage.getItem(this.KEYS.DIALOGUE_TEMPLATES);
       return templates ? JSON.parse(templates) : [];
@@ -397,10 +476,10 @@ class StorageService {
     }
   }
 
-  saveDialogueTemplate(template: unknown): void {
+  saveDialogueTemplate(template: Record<string, unknown>): void {
     try {
       const templates = this.getDialogueTemplates();
-      const existingIndex = templates.findIndex((t: { id: string }) => t.id === (template as { id: string }).id);
+      const existingIndex = templates.findIndex((t: Record<string, unknown>) => t.id === template.id);
       
       if (existingIndex >= 0) {
         templates[existingIndex] = template;
@@ -463,6 +542,65 @@ class StorageService {
       }
     } catch (error) {
       console.error('Failed to update template usage:', error);
+    }
+  }
+
+  // 新的话术分析相关存储方法
+
+  // 对话文件管理
+  getConversationFiles(): ConversationFile[] {
+    try {
+      const files = localStorage.getItem(this.KEYS.CONVERSATION_FILES);
+      return files ? JSON.parse(files) : [];
+    } catch (error) {
+      console.error('Failed to get conversation files:', error);
+      return [];
+    }
+  }
+
+  saveConversationFiles(files: ConversationFile[]): void {
+    try {
+      localStorage.setItem(this.KEYS.CONVERSATION_FILES, JSON.stringify(files));
+    } catch (error) {
+      console.error('Failed to save conversation files:', error);
+    }
+  }
+
+  // 场景分析管理
+  getScenarioAnalyses(): ScenarioAnalysis[] {
+    try {
+      const analyses = localStorage.getItem(this.KEYS.SCENARIO_ANALYSES);
+      return analyses ? JSON.parse(analyses) : [];
+    } catch (error) {
+      console.error('Failed to get scenario analyses:', error);
+      return [];
+    }
+  }
+
+  saveScenarioAnalyses(analyses: ScenarioAnalysis[]): void {
+    try {
+      localStorage.setItem(this.KEYS.SCENARIO_ANALYSES, JSON.stringify(analyses));
+    } catch (error) {
+      console.error('Failed to save scenario analyses:', error);
+    }
+  }
+
+  // 营销流程管理
+  getMarketingFlows(): MarketingFlow[] {
+    try {
+      const flows = localStorage.getItem(this.KEYS.MARKETING_FLOWS);
+      return flows ? JSON.parse(flows) : [];
+    } catch (error) {
+      console.error('Failed to get marketing flows:', error);
+      return [];
+    }
+  }
+
+  saveMarketingFlows(flows: MarketingFlow[]): void {
+    try {
+      localStorage.setItem(this.KEYS.MARKETING_FLOWS, JSON.stringify(flows));
+    } catch (error) {
+      console.error('Failed to save marketing flows:', error);
     }
   }
 

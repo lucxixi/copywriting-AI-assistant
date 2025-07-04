@@ -1,16 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Check, 
-  X, 
-  TestTube,
-  AlertCircle,
-  CheckCircle,
-  Loader
-} from 'lucide-react';
 import { ApiConfig as ApiConfigType, API_PROVIDERS } from '../types/api';
 import { storageService } from '../services/storage';
 import { apiService } from '../services/api';
